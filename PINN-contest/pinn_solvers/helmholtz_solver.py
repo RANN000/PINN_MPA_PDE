@@ -438,6 +438,7 @@ def continue_training_from_checkpoint(
 
     return model, training_info
 
+
 def train_helmholtz_pinn(model: HelmholtzPINN, X_interior, X_boundary, 
                          X_test, u_test_true,
                          optimizer=None,
@@ -540,6 +541,8 @@ def train_helmholtz_pinn(model: HelmholtzPINN, X_interior, X_boundary,
 
     print(f"\n训练完成！最佳测试误差: {best_test_loss:.6e}")
     return model
+
+
 
 
 if __name__ == "__main__":

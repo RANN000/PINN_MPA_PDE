@@ -1,2 +1,0 @@
-width,depth,lr,lambda_pde,lambda_bc,relative_l2_error,max_error
-40,3,0.0005,0.5,50,0.026615621633992732,0.20723918080329895

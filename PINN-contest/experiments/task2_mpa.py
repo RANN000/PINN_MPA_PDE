@@ -38,8 +38,8 @@ def main():
 
     # 1. 加载数据
     print("\n1. 加载数据...")
-    path = '../data/子任务2_亥姆霍兹方程数据_k1000.xlsx'
-    loader = HelmholtzDataLoader(path, task='task2', k=1000)
+    path = '../data/子任务2_亥姆霍兹方程数据_k100.xlsx'
+    loader = HelmholtzDataLoader(path, task='task2', k=100)
 
     # 获取训练数据
     X_train, q_train, boundary_mask = loader.get_training_points()
@@ -68,8 +68,8 @@ def main():
         'learning_rate': 0.001,
         'weight_decay': 0.0,
         'wavenumber': loader.k, #根据加载的数据不同而改变
-        'lambda_pde': 0.5,
-        'lambda_bc': 50.0
+        'lambda_pde': 50,
+        'lambda_bc': 0.5
     }
 
     model = HelmholtzPINN(config).to(device)

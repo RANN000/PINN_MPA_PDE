@@ -16,7 +16,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # 导入自定义模块
 from data.data_loader import HelmholtzDataLoader
-from pinn_solvers.helmholtz_solver import HelmholtzPINN, train_helmholtz_pinn
+from pinn_solvers.helmholtz_solver import HelmholtzPINN, train_helmholtz_pinn, train_helmholtz_pinn_improved
 
 # 设置设备
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -37,13 +37,13 @@ def main():
     # 1. 加载数据选择文件，可改写
     print("\n1. 加载数据...")
     # 选择文件
-    path = "../data/子任务2_亥姆霍兹方程数据_k1000.xlsx"
+    path = "../data/子任务2_亥姆霍兹方程数据_k100.xlsx"
     # 选择子任务
     task = "task2"
     # 选择波数
-    k = 1000
+    k = 100
     # 选择网络类型: standard, mffm, r_gpinn
-    network = 'standard'
+    network = 'mffm'
 
     loader = HelmholtzDataLoader(path, task=task, k=k)
     X_train, q_train, boundary_mask = loader.get_training_points()
@@ -64,8 +64,8 @@ def main():
     widths = [40]
     depths = [3]
     lrs = [0.001]
-    lambda_pdes = [0.5]
-    lambda_bcs = [50]
+    lambda_pdes = [100, 50]
+    lambda_bcs = [0.5, 1]
 
     param_grid = [(w, d, lr, lp, lb) for w in widths for d in depths for lr in lrs for lp in lambda_pdes for lb in
                   lambda_bcs]
@@ -95,16 +95,19 @@ def main():
         results_dir = Path(f'../results/{task}_{network}/width{width}_depth{depth}_lr{lr}_pde{lambda_pde}_bc{lambda_bc}')
         results_dir.mkdir(exist_ok=True, parents=True)
 
-        model = train_helmholtz_pinn(
+        model ,training_info = train_helmholtz_pinn_improved(
             model=model,
             X_interior=X_interior,
             X_boundary=X_boundary,
             X_test=X_test,
             u_test_true=u_test_true,
-            n_epochs=2000,  # 网格搜索时先用小 epoch
+            n_epochs=1000,  # 网格搜索时先用小 epoch
             batch_size=256,
             log_every=100,
-            save_dir=str(results_dir)
+            save_dir=str(results_dir),
+            use_lr_scheduler=True,
+            scheduler_type='plateau',
+            early_stopping_patience=300
         )
         # 评估
         eval_result = model.evaluate(X_test, u_test_true)

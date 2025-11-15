@@ -18,7 +18,10 @@ from pathlib import Path
 
 # 导入自定义模块
 from data.data_loader import HelmholtzDataLoader
-from pinn_solvers.helmholtz_solver import HelmholtzPINN, train_helmholtz_pinn, train_helmholtz_pinn_improved
+from pinn_solvers.helmholtz_solver import (HelmholtzPINN,
+                                           train_helmholtz_pinn,
+                                           train_helmholtz_pinn_improved,
+                                           continue_training_from_checkpoint)
 
 # 设置设备
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -68,8 +71,8 @@ def main():
         'learning_rate': 0.001,
         'weight_decay': 0.0,
         'wavenumber': loader.k, #根据加载的数据不同而改变
-        'lambda_pde': 0.5,
-        'lambda_bc': 50.0
+        'lambda_pde': 50.0,
+        'lambda_bc': 0.5
     }
 
     model = HelmholtzPINN(config).to(device)
@@ -77,6 +80,10 @@ def main():
     # 统计参数数量
     n_params = sum(p.numel() for p in model.net.parameters())
     print(f"   网络参数数量: {n_params}")
+
+    # 3. 训练模型
+    print("\n3. 训练模型...")
+    results_dir = Path('../results/task2_mffm_mpa_improved')
 
     # MPA分析（快速模式）
     print("   运行MPA快速分析...")
@@ -96,11 +103,6 @@ def main():
 
     print(f"   MPA推荐优化器: {opt_name}")
     print(f"   调整后学习率: {optimizer.param_groups[0]['lr']:.6f}")
-
-
-    # 3. 训练模型
-    print("\n3. 训练模型...")
-    results_dir = Path('../results/task2_mffm_mpa_improved')
 
     import time
     start_time = time.time()
