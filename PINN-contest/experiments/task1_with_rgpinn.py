@@ -165,7 +165,7 @@ def visualize_results(X_test, u_true, u_pred, train_loss, test_loss, save_dir):
     ax5.plot(test_loss, label='Test Relative L2 Error')
     ax5.set_xlabel('Epoch')
     ax5.set_ylabel('Relative L2 Error')
-    ax5.set_title('est Error')
+    ax5.set_title('Test Error')
     ax5.legend()
     ax5.set_yscale('log')
 

@@ -110,61 +110,111 @@ class BasePINN(nn.Module):
         # 训练历史
         self.train_loss_history = []
         self.test_loss_history = []
-        
+        self.pde_loss_history = []  # PDE损失历史
+        self.bc_loss_history = []  # 边界损失历史
+        self.data_loss_history = []  # 数据损失历史
+        self.l2_error_history = []  # L2误差历史
+
     def forward(self, x):
         """前向传播"""
         return self.net(x)
-    
+
     def pde_loss(self, x, u_pred):
         """
         PDE残差损失
         子类需要重写此方法以定义具体的PDE
         """
         raise NotImplementedError("Subclass must implement pde_loss")
-    
+
     def boundary_loss(self, x_bc, u_bc_true):
         """
         边界条件损失
         """
         u_bc_pred = self.forward(x_bc)
         return torch.mean((u_bc_pred - u_bc_true) ** 2)
-    
+
     def data_loss(self, x_data, u_data_true):
         """
         数据拟合损失（用于反问题）
         """
         u_data_pred = self.forward(x_data)
         return torch.mean((u_data_pred - u_data_true) ** 2)
+
+    def compute_loss_components(self, batch_dict: Dict) -> Dict:
+        """
+        计算各个损失分量
+        返回: 包含各个损失分量的字典
+        """
+        loss_components = {}
+
+        # PDE残差损失
+        if 'x_interior' in batch_dict:
+            x_pde = batch_dict['x_interior']
+            u_pde_pred = self.forward(x_pde)
+            loss_components['pde_loss'] = self.pde_loss(x_pde, u_pde_pred)
+
+        # 边界条件损失
+        if 'x_boundary' in batch_dict and 'u_boundary' in batch_dict:
+            loss_components['bc_loss'] = self.boundary_loss(
+                batch_dict['x_boundary'],
+                batch_dict['u_boundary']
+            )
+
+        # 数据拟合损失（用于反问题）
+        if 'x_data' in batch_dict and 'u_data' in batch_dict:
+            loss_components['data_loss'] = self.data_loss(
+                batch_dict['x_data'],
+                batch_dict['u_data']
+            )
+
+        return loss_components
     
+    def compute_total_loss_improved(self, batch_dict: Dict) -> Tuple[torch.Tensor, Dict]:
+        """
+        计算总损失和各个损失分量
+        返回: (总损失, 损失分量字典)
+        """
+        loss_components = self.compute_loss_components(batch_dict)
+
+        total_loss = torch.tensor(0.0, device=self.device)  # 确保是张量
+        if 'pde_loss' in loss_components:
+            total_loss += self.lambda_pde * loss_components['pde_loss']
+        if 'bc_loss' in loss_components:
+            total_loss += self.lambda_bc * loss_components['bc_loss']
+        if 'data_loss' in loss_components:
+            total_loss += self.lambda_data * loss_components['data_loss']
+
+        return total_loss, loss_components
+
     def compute_total_loss(self, batch_dict: Dict) -> torch.Tensor:
         """
         计算总损失
         batch_dict包含: x_interior, x_boundary, x_data等
         """
         loss = 0.0
-        
+
         # PDE残差损失
         if 'x_interior' in batch_dict:
             x_pde = batch_dict['x_interior']
             u_pde_pred = self.forward(x_pde)
             loss += self.lambda_pde * self.pde_loss(x_pde, u_pde_pred)
-        
+
         # 边界条件损失
         if 'x_boundary' in batch_dict and 'u_boundary' in batch_dict:
             loss += self.lambda_bc * self.boundary_loss(
-                batch_dict['x_boundary'], 
+                batch_dict['x_boundary'],
                 batch_dict['u_boundary']
             )
-        
+
         # 数据拟合损失（用于反问题）
         if 'x_data' in batch_dict and 'u_data' in batch_dict:
             loss += self.lambda_data * self.data_loss(
                 batch_dict['x_data'],
                 batch_dict['u_data']
             )
-        
+
         return loss
-    
+
     def train_step(self, batch_dict: Dict, optimizer) -> float:
         """单步训练"""
         optimizer.zero_grad()
@@ -172,6 +222,14 @@ class BasePINN(nn.Module):
         loss.backward()
         optimizer.step()
         return loss.item()
+
+    def train_step_improved(self, batch_dict: Dict, optimizer) -> Tuple[float, Dict]:
+        """单步训练，返回总损失和损失分量"""
+        optimizer.zero_grad()
+        total_loss, loss_components = self.compute_total_loss_improved(batch_dict)
+        total_loss.backward()
+        optimizer.step()
+        return total_loss.item(), loss_components
     
     def evaluate(self, x_test: np.ndarray, u_true: np.ndarray) -> Dict:
         """
@@ -187,20 +245,6 @@ class BasePINN(nn.Module):
         errors['u_pred'] = u_pred  # 如果还想返回预测值
 
         return errors
-
-        # # 计算各种误差指标
-        # l2_error = np.sqrt(np.mean((u_pred - u_true) ** 2))
-        # relative_l2_error = l2_error / (np.sqrt(np.mean(u_true ** 2)) + 1e-10)
-        # max_error = np.max(np.abs(u_pred - u_true))
-        # relative_max_error = max_error / (np.max(np.abs(u_true)) + 1e-10)
-        #
-        # return {
-        #     'l2_error': l2_error,
-        #     'relative_l2_error': relative_l2_error,
-        #     'max_error': max_error,
-        #     'relative_max_error': relative_max_error,
-        #     'u_pred': u_pred
-        # }
     
     def save_checkpoint(self, path: str, epoch: int, optimizer_state: Dict):
         """保存模型检查点"""
